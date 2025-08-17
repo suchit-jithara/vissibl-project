@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Download Excel</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        body {
+          font-family: system-ui, sans-serif;
+          background: #0f172a;
+          color: #e5e7eb;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+          margin: 0;
+        }
+        .card {
+          background: #1e293b;
+          padding: 2rem;
+          border-radius: 12px;
+          text-align: center;
+          box-shadow: 0 8px 24px rgba(0,0,0,.5);
+        }
+        button {
+          background: linear-gradient(135deg, #4f46e5, #22d3ee);
+          border: none;
+          color: #fff;
+          font-weight: 600;
+          padding: 12px 20px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 16px;
+          transition: transform .1s, opacity .2s;
+        }
+        button:active { transform: translateY(1px); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        #status {
+          margin-top: 1rem;
+          font-size: 14px;
+          color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>Download Excel File</h2>
+    <p>Click the button to fetch the Excel file from API.</p>
+    <button id="downloadBtn">Download XLSX</button>
+    <div id="status"></div>
+</div>
+
+<script>
+    const btn = document.getElementById('downloadBtn');
+    const statusEl = document.getElementById('status');
+
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      statusEl.textContent = "Fetching Excel file...";
+
+      try {
+        const response = await fetch("http://localhost:8080/api/table/xlsx/11");
+        if (!response.ok) throw new Error("Server returned " + response.status);
+
+        const blob = await response.blob();   // Excel file bytes
+        const url = window.URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "exported-data.xlsx"; // suggested filename
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+
+        statusEl.textContent = "✅ Download started!";
+      } catch (err) {
+        statusEl.textContent = "❌ Failed: " + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+</script>
+</body>
+</html>
