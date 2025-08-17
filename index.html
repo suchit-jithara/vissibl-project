@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Upload Table (.xlsx / .csv)</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+        :root{
+          --bg:#0f172a;          /* slate-900 */
+          --card:#111827;        /* gray-900 */
+          --muted:#94a3b8;       /* slate-400 */
+          --text:#e5e7eb;        /* gray-200 */
+          --accent:#4f46e5;      /* indigo-600 */
+          --accent-2:#22d3ee;    /* cyan-400 */
+          --ok:#16a34a;          /* green-600 */
+          --err:#ef4444;         /* red-500 */
+          --border:#1f2937;      /* gray-800 */
+        }
+
+        * { box-sizing: border-box; }
+        body{
+          margin:0;
+          min-height:100dvh;
+          display:grid;
+          place-items:center;
+          background:
+            radial-gradient(1200px 800px at 10% -10%, rgba(79,70,229,.25), transparent 50%),
+            radial-gradient(1200px 800px at 110% 110%, rgba(34,211,238,.2), transparent 50%),
+            var(--bg);
+          color:var(--text);
+          font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+        }
+
+        .card{
+          width:min(680px, 92vw);
+          background:linear-gradient(180deg, #0b1220 0%, #0a0f1a 100%);
+          border:1px solid var(--border);
+          border-radius:18px;
+          padding:28px;
+          box-shadow:
+            0 30px 80px rgba(0,0,0,.5),
+            inset 0 1px 0 rgba(255,255,255,.03);
+          backdrop-filter:saturate(120%) blur(2px);
+        }
+
+        h1{
+          margin:0 0 6px;
+          font-size:clamp(20px, 3.3vw, 28px);
+          letter-spacing:.2px;
+        }
+        p.lead{
+          margin:0 0 18px;
+          color:var(--muted);
+          font-size:14px;
+        }
+
+        .drop{
+          margin-top:14px;
+          padding:26px;
+          border:1.5px dashed rgba(148,163,184,.35);
+          border-radius:14px;
+          background:rgba(2,6,23,.35);
+          text-align:center;
+          transition:border-color .2s, background .2s, transform .1s;
+          cursor:pointer;
+          user-select:none;
+        }
+        .drop.dragover{
+          border-color:var(--accent-2);
+          background:rgba(34,211,238,.06);
+          transform:scale(0.999);
+        }
+        .drop strong{ color:#fff; }
+        .hint{ color:var(--muted); font-size:13px; margin-top:6px; }
+
+        .controls{
+          margin-top:18px;
+          display:flex;
+          gap:12px;
+          flex-wrap:wrap;
+          align-items:center;
+          justify-content:flex-start;
+        }
+
+        .btn{
+          appearance:none;
+          border:none;
+          border-radius:12px;
+          padding:12px 16px;
+          font-weight:600;
+          background:linear-gradient(135deg, var(--accent), var(--accent-2));
+          color:#0b1020;
+          cursor:pointer;
+          transition:transform .05s ease, filter .15s ease, opacity .2s;
+        }
+        .btn:disabled{
+          opacity:.55;
+          cursor:not-allowed;
+          filter:grayscale(.2);
+        }
+        .btn:active{ transform:translateY(1px); }
+
+        .ghost{
+          background:transparent;
+          border:1px solid var(--border);
+          color:var(--text);
+        }
+
+        .file-pill{
+          display:inline-flex;
+          align-items:center;
+          gap:10px;
+          border:1px solid var(--border);
+          padding:10px 12px;
+          border-radius:12px;
+          color:var(--text);
+          background:rgba(148,163,184,.06);
+          font-size:14px;
+        }
+        .file-pill .badge{
+          display:inline-block;
+          font-size:11px;
+          padding:2px 6px;
+          border-radius:999px;
+          border:1px solid var(--border);
+          color:var(--muted);
+        }
+
+        .status{
+          margin-top:14px;
+          font-size:14px;
+        }
+        .status.ok{ color:var(--ok); }
+        .status.err{ color:var(--err); }
+
+        .progress-wrap{
+          margin-top:12px;
+          display:none;
+        }
+        progress{
+          width:100%;
+          height:10px;
+          border:0;
+          border-radius:999px;
+          background:#0b1220;
+          overflow:hidden;
+        }
+        progress::-webkit-progress-bar{
+          background:#0b1220;
+        }
+        progress::-webkit-progress-value{
+          background:linear-gradient(90deg, var(--accent), var(--accent-2));
+          border-radius:999px;
+        }
+        progress::-moz-progress-bar{
+          background:linear-gradient(90deg, var(--accent), var(--accent-2));
+        }
+
+        footer{
+          margin-top:18px;
+          font-size:12px;
+          color:var(--muted);
+          text-align:center;
+        }
+
+        input[type="file"]{ display:none; }
+    </style>
+</head>
+<body>
+<main class="card" role="main" aria-labelledby="title">
+    <h1 id="title">Upload a table file</h1>
+    <p class="lead">Accepted formats: <code>.xlsx</code> (Excel) or <code>.csv</code>. We’ll POST it as <em>multipart/form-data</em>.</p>
+
+    <!-- Invisible file input (clicked by buttons / drop area) -->
+    <input id="fileInput" type="file" accept=".xlsx,.csv" />
+
+    <!-- Drop area -->
+    <div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose or drop a file">
+        <div><strong>Click to choose</strong> or drop your file here</div>
+        <div class="hint">Only .xlsx or .csv — max ~50 MB (configurable)</div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <button id="chooseBtn" class="btn ghost" type="button">Choose file</button>
+        <span id="fileBadge" class="file-pill" style="display:none;">
+        <span id="fileName">no file</span>
+        <span class="badge" id="fileSize"></span>
+      </span>
+        <span style="flex:1 0 0;"></span>
+        <button id="uploadBtn" class="btn" type="button" disabled>Upload</button>
+    </div>
+
+    <!-- Progress + status -->
+    <div class="progress-wrap" id="progressWrap">
+        <progress id="progress" max="100" value="0"></progress>
+    </div>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+
+    <footer>
+        Endpoint: <code>http://localhost:8080/api/table/uploadxlsx</code>
+    </footer>
+</main>
+
+<script>
+    (() => {
+      const ENDPOINT = "http://localhost:8080/api/table/uploadxlsx"; // change if needed
+      const MAX_MB = 50; // client-side guard; adjust to your needs
+
+      const $ = (id) => document.getElementById(id);
+      const fileInput   = $('fileInput');
+      const drop        = $('drop');
+      const chooseBtn   = $('chooseBtn');
+      const uploadBtn   = $('uploadBtn');
+      const fileBadge   = $('fileBadge');
+      const fileNameEl  = $('fileName');
+      const fileSizeEl  = $('fileSize');
+      const statusEl    = $('status');
+      const progress    = $('progress');
+      const progressWrap= $('progressWrap');
+
+      let file = null;
+
+      function fmtBytes(bytes){
+        const units = ['B','KB','MB','GB'];
+        let i=0, n=bytes;
+        while(n>=1024 && i<units.length-1){ n/=1024; i++; }
+        return `${n.toFixed(n<10 && i>0 ? 1 : 0)} ${units[i]}`;
+      }
+
+      function isAllowed(f){
+        const name = f.name.toLowerCase();
+        const extOk = name.endsWith('.xlsx') || name.endsWith('.csv');
+        const sizeOk = f.size <= MAX_MB * 1024 * 1024;
+        return { extOk, sizeOk };
+      }
+
+      function setFile(f){
+        if(!f){ return; }
+        const { extOk, sizeOk } = isAllowed(f);
+        if(!extOk){
+          showStatus('Please choose a .xlsx or .csv file.', 'err');
+          return;
+        }
+        if(!sizeOk){
+          showStatus(`File is too large (>${MAX_MB} MB).`, 'err');
+          return;
+        }
+        file = f;
+        fileNameEl.textContent = f.name;
+        fileSizeEl.textContent = fmtBytes(f.size);
+        fileBadge.style.display = 'inline-flex';
+        uploadBtn.disabled = false;
+        clearStatus();
+      }
+
+      function clearStatus(){
+        statusEl.textContent = '';
+        statusEl.className = 'status';
+      }
+
+      function showStatus(msg, kind=''){
+        statusEl.textContent = msg;
+        statusEl.className = 'status ' + (kind || '');
+      }
+
+      // Click to open file dialog
+      chooseBtn.addEventListener('click', () => fileInput.click());
+      drop.addEventListener('click', () => fileInput.click());
+      drop.addEventListener('keydown', (e) => {
+        if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); fileInput.click(); }
+      });
+
+      // Drag & drop behavior
+      ['dragenter','dragover'].forEach(ev => {
+        drop.addEventListener(ev, (e) => {
+          e.preventDefault(); e.stopPropagation();
+          drop.classList.add('dragover');
+        });
+      });
+      ;['dragleave','drop'].forEach(ev => {
+        drop.addEventListener(ev, (e) => {
+          e.preventDefault(); e.stopPropagation();
+          drop.classList.remove('dragover');
+        });
+      });
+      drop.addEventListener('drop', (e) => {
+        const f = e.dataTransfer.files?.[0];
+        setFile(f);
+      });
+
+      // File chosen via dialog
+      fileInput.addEventListener('change', () => {
+        const f = fileInput.files?.[0];
+        setFile(f);
+      });
+
+      // Upload via fetch (multipart/form-data). If you need upload progress, see the XHR version below.
+      uploadBtn.addEventListener('click', async () => {
+        if(!file){ return; }
+        uploadBtn.disabled = true;
+        chooseBtn.disabled = true;
+        progressWrap.style.display = 'block';
+        progress.value = 10;
+        showStatus('Uploading…');
+
+        try{
+          const form = new FormData();
+          // Most backends expect "file" as the field name. Change if your API expects a different key.
+          form.append('file', file, file.name);
+
+          const res = await fetch(ENDPOINT, {
+            method: 'POST',
+            body: form,
+            // Do NOT set Content-Type here; the browser will set the proper multipart boundary.
+          });
+
+          progress.value = 70;
+
+          // Attempt to parse JSON if provided; otherwise fall back to text
+          let payloadText = await res.text();
+          let payload;
+          try { payload = JSON.parse(payloadText); } catch { payload = payloadText; }
+
+          if(!res.ok){
+            throw new Error(typeof payload === 'string' ? payload : JSON.stringify(payload));
+          }
+
+          progress.value = 100;
+          showStatus('Upload successful ✅', 'ok');
+
+          // Optional: show a tiny snippet of the response for visibility (without overwhelming)
+          console.log('Server response:', payload);
+
+        } catch (err){
+          showStatus(`Upload failed: ${err.message || err}`, 'err');
+        } finally {
+          uploadBtn.disabled = !file;
+          chooseBtn.disabled = false;
+          setTimeout(() => { progressWrap.style.display = 'none'; progress.value = 0; }, 700);
+        }
+      });
+
+      // --- Optional: XHR version with real upload progress ---
+      // If you prefer true upload progress (instead of the fake steps above), comment out the fetch
+      // block and call uploadWithXHR() inside the click handler.
+      function uploadWithXHR(){
+        if(!file) return;
+        const xhr = new XMLHttpRequest();
+        const form = new FormData();
+        form.append('file', file, file.name);
+
+        xhr.open('POST', ENDPOINT, true);
+
+        xhr.upload.onprogress = (e) => {
+          if(e.lengthComputable){
+            const pct = Math.round((e.loaded / e.total) * 100);
+            progressWrap.style.display = 'block';
+            progress.value = pct;
+            showStatus(`Uploading… ${pct}%`);
+          }
+        };
+
+        xhr.onload = () => {
+          if(xhr.status >= 200 && xhr.status < 300){
+            showStatus('Upload successful ✅', 'ok');
+          } else {
+            showStatus(`Upload failed: ${xhr.status} ${xhr.responseText}`, 'err');
+          }
+          setTimeout(() => { progressWrap.style.display = 'none'; progress.value = 0; }, 700);
+          uploadBtn.disabled = !file;
+          chooseBtn.disabled = false;
+        };
+
+        xhr.onerror = () => {
+          showStatus('Network error during upload.', 'err');
+          uploadBtn.disabled = !file;
+          chooseBtn.disabled = false;
+          progressWrap.style.display = 'none';
+          progress.value = 0;
+        };
+
+        uploadBtn.disabled = true;
+        chooseBtn.disabled = true;
+        xhr.send(form);
+      }
+    })();
+</script>
+</body>
+</html>
